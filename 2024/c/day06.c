@@ -4,7 +4,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -30,14 +29,6 @@ struct mdspan_t {
 
 typedef struct mdspan_t input_t;
 
-static inline void mdspan_clone_from(struct mdspan_t *dest,
-                                     const struct mdspan_t *src) {
-  memcpy(dest->dimensions, src->dimensions, sizeof(dim_t));
-  dest->buffer = malloc(MD_CM_BUFLEN(*src));
-  dest->stride = src->stride;
-  memcpy(dest->buffer, src->buffer, MD_CM_BUFLEN(*src));
-}
-
 static inline void mdspan_search(struct mdspan_t map, idx_t *x, idx_t *y,
                                  char c) {
   for_all_points(*x, *y, map.dimensions) {
@@ -47,22 +38,26 @@ static inline void mdspan_search(struct mdspan_t map, idx_t *x, idx_t *y,
   }
 }
 
-#define INPUT_DIMS {130, 130}
+#define INPUT_COLS 130
+#define INPUT_ROWS 130
+#define INPUT_DIMS {INPUT_COLS, INPUT_ROWS}
 #define INPUT_STRIDE 131
+#define INPUT_BUFLEN (INPUT_ROWS * INPUT_STRIDE)
 
 input_t parse_input() {
-  input_t result = {.dimensions = INPUT_DIMS, .stride = INPUT_STRIDE};
-  const size_t buffer_size = MD_CM_BUFLEN(result);
-  result.buffer = malloc(buffer_size * sizeof(char));
-  if (!(fread(result.buffer, sizeof(char), buffer_size, stdin) ||
-        feof(stdin))) {
+  static char buffer[INPUT_BUFLEN];
+  if (!(fread(buffer, sizeof(char), INPUT_BUFLEN, stdin) || feof(stdin))) {
     err(ferror(stdin), NULL);
   }
-  result.buffer[buffer_size - 1] = '\0';
+  buffer[INPUT_BUFLEN - 1] = '\0';
+
+  input_t result = {
+      .buffer = buffer,
+      .dimensions = INPUT_DIMS,
+      .stride = INPUT_STRIDE,
+  };
   return result;
 }
-
-void free_input(input_t input) { free(input.buffer); }
 
 #define TILE_EMPTY '.'
 #define TILE_COP '^'
@@ -128,8 +123,13 @@ static inline bool step_once(struct cursor_t *cursor, struct mdspan_t map) {
 }
 
 uint32_t part1(input_t input) {
-  struct mdspan_t map;
-  mdspan_clone_from(&map, &input);
+  static char map_buffer[INPUT_BUFLEN];
+  struct mdspan_t map = {
+      .buffer = map_buffer,
+      .dimensions = INPUT_DIMS,
+      .stride = INPUT_STRIDE,
+  };
+  memcpy(map.buffer, input.buffer, INPUT_BUFLEN);
 
   struct cursor_t cursor = {.x = 0, .y = 0, .direction = DIR_UP};
   mdspan_search(map, &cursor.x, &cursor.y, TILE_COP);
@@ -143,7 +143,6 @@ uint32_t part1(input_t input) {
     count += MD_CM_GET(x, y, map) == TILE_EXPLORED;
   }
 
-  free(map.buffer);
   return count;
 }
 
@@ -158,12 +157,23 @@ bool find_loop(struct cursor_t cursor, struct mdspan_t map,
   return false;
 }
 
+#define DIRECTIONS_STRIDE 130
+#define DIRECTIONS_BUFLEN (INPUT_ROWS * DIRECTIONS_STRIDE)
+
 uint32_t part2(input_t input) {
-  struct mdspan_t map,
-      directions = {.dimensions = INPUT_DIMS, .stride = INPUT_STRIDE - 1};
-  mdspan_clone_from(&map, &input);
-  memcpy(directions.dimensions, input.dimensions, sizeof(dim_t));
-  directions.buffer = malloc(MD_CM_BUFLEN(directions));
+  static char map_buffer[INPUT_BUFLEN];
+  struct mdspan_t map = {
+      .buffer = map_buffer,
+      .dimensions = INPUT_DIMS,
+      .stride = INPUT_STRIDE,
+  };
+  memcpy(map.buffer, input.buffer, INPUT_BUFLEN);
+  static char directions_buffer[DIRECTIONS_BUFLEN];
+  struct mdspan_t directions = {
+      .buffer = directions_buffer,
+      .dimensions = INPUT_DIMS,
+      .stride = DIRECTIONS_STRIDE,
+  };
 
   struct cursor_t start = {.x = 0, .y = 0, .direction = DIR_UP};
   mdspan_search(map, &start.x, &start.y, TILE_COP);
@@ -189,9 +199,7 @@ uint32_t part2(input_t input) {
       MD_CM_GET(x, y, map) = TILE_EMPTY;
     }
   }
-  free(map.buffer);
-  free(directions.buffer);
   return count;
 }
 
-DECLARE_AOC_RUNNER_ALLOC();
+DECLARE_AOC_RUNNER();
