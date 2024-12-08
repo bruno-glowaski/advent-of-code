@@ -122,7 +122,7 @@ static inline bool step_once(struct cursor_t *cursor, struct mdspan_t map) {
   return true;
 }
 
-uint32_t part1(input_t input) {
+uint64_t part1(input_t input) {
   static char map_buffer[INPUT_BUFLEN];
   struct mdspan_t map = {
       .buffer = map_buffer,
@@ -160,7 +160,7 @@ bool find_loop(struct cursor_t cursor, struct mdspan_t map,
 #define DIRECTIONS_STRIDE 130
 #define DIRECTIONS_BUFLEN (INPUT_ROWS * DIRECTIONS_STRIDE)
 
-uint32_t part2(input_t input) {
+uint64_t part2(input_t input) {
   static char map_buffer[INPUT_BUFLEN];
   struct mdspan_t map = {
       .buffer = map_buffer,
