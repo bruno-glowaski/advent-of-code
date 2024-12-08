@@ -1,3 +1,5 @@
+#include "shared.h"
+
 #include <err.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -125,9 +127,9 @@ static inline bool step_once(struct cursor_t *cursor, struct mdspan_t map) {
   return true;
 }
 
-uint32_t part1(const input_t *input) {
+uint32_t part1(input_t input) {
   struct mdspan_t map;
-  mdspan_clone_from(&map, input);
+  mdspan_clone_from(&map, &input);
 
   struct cursor_t cursor = {.x = 0, .y = 0, .direction = DIR_UP};
   mdspan_search(map, &cursor.x, &cursor.y, TILE_COP);
@@ -156,11 +158,11 @@ bool find_loop(struct cursor_t cursor, struct mdspan_t map,
   return false;
 }
 
-uint32_t part2(const input_t *input) {
+uint32_t part2(input_t input) {
   struct mdspan_t map,
       directions = {.dimensions = INPUT_DIMS, .stride = INPUT_STRIDE - 1};
-  mdspan_clone_from(&map, input);
-  memcpy(directions.dimensions, input->dimensions, sizeof(dim_t));
+  mdspan_clone_from(&map, &input);
+  memcpy(directions.dimensions, input.dimensions, sizeof(dim_t));
   directions.buffer = malloc(MD_CM_BUFLEN(directions));
 
   struct cursor_t start = {.x = 0, .y = 0, .direction = DIR_UP};
@@ -192,9 +194,4 @@ uint32_t part2(const input_t *input) {
   return count;
 }
 
-int main() {
-  input_t input = parse_input();
-  printf("Part 1: %i\n", part1(&input));
-  printf("Part 2: %i\n", part2(&input));
-  free_input(input);
-}
+DECLARE_AOC_RUNNER_ALLOC();
