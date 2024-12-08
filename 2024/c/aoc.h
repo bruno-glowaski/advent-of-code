@@ -1,4 +1,5 @@
 #include <signal.h>
+#include <stdint.h>
 #include <stdio.h>
 
 #define DECLARE_AOC_RUNNER_ALLOC()                                             \
