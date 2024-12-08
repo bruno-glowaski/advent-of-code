@@ -1,5 +1,6 @@
-#include "shared.h"
+#include "aoc.h"
 
+#include "mdspan.h"
 #include <err.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -7,36 +8,13 @@
 #include <string.h>
 #include <unistd.h>
 
-typedef intptr_t idx_t;
-typedef idx_t dim_t[2];
-struct mdspan_t {
-  char *buffer;
-  dim_t dimensions;
-  idx_t stride;
-};
+#include "mdspan.h"
 
-#define MD_IN(_x, _y, _dimensions)                                             \
-  ((_x) >= 0 && (_y) >= 0 && (_x) < (_dimensions)[0] && (_y) < (_dimensions)[1])
-#define for_all_points(_x, _y, _dimensions)                                    \
-  for ((_x) = 0, (_y) = 0; MD_IN((_x), (_y), (_dimensions));                   \
-       (_y) += ((_x) + 1) / (_dimensions)[0],                                  \
-      (_x) = ((_x) + 1) % (_dimensions)[0])
-#define MD_CM_MAPPING(_x, _y, _stride) ((_y) * (_stride) + (_x))
-#define MD_CM_BUFLEN(_span)                                                    \
-  MD_CM_MAPPING(0, (_span).dimensions[1], (_span).stride)
-#define MD_CM_GET(_x, _y, _span)                                               \
-  ((_span).buffer[MD_CM_MAPPING((_x), (_y), (_span).stride)])
-
-typedef struct mdspan_t input_t;
-
-static inline void mdspan_search(struct mdspan_t map, idx_t *x, idx_t *y,
-                                 char c) {
-  for_all_points(*x, *y, map.dimensions) {
-    if (MD_CM_GET(*x, *y, map) == c) {
-      break;
-    }
-  }
-}
+typedef MDSPAN(char) mdspan_t;
+DECLARE_MDSPAN_SEARCH(mdspan_t, mdspan_search);
+typedef mdspan_t input_t;
+#define MD_GET(_span, _x, _y) MD_CM_GET(_span, _x, _y)
+#define MD_BUFLEN(_span) MD_CM_BUFLEN(_span)
 
 #define INPUT_COLS 130
 #define INPUT_ROWS 130
@@ -106,14 +84,14 @@ struct cursor_t {
   enum dir_t direction;
 };
 
-static inline bool step_once(struct cursor_t *cursor, struct mdspan_t map) {
+static inline bool step_once(struct cursor_t *cursor, mdspan_t map) {
   while (true) {
     idx_t x_next = cursor->x, y_next = cursor->y;
     step_towards(&x_next, &y_next, cursor->direction);
     if (!MD_IN(x_next, y_next, map.dimensions)) {
       return false;
     }
-    if (MD_CM_GET(x_next, y_next, map) != TILE_BLOCK) {
+    if (MD_GET(map, x_next, y_next) != TILE_BLOCK) {
       break;
     }
     cursor->direction = rotate_right(cursor->direction);
@@ -124,7 +102,7 @@ static inline bool step_once(struct cursor_t *cursor, struct mdspan_t map) {
 
 uint64_t part1(input_t input) {
   static char map_buffer[INPUT_BUFLEN];
-  struct mdspan_t map = {
+  mdspan_t map = {
       .buffer = map_buffer,
       .dimensions = INPUT_DIMS,
       .stride = INPUT_STRIDE,
@@ -134,25 +112,24 @@ uint64_t part1(input_t input) {
   struct cursor_t cursor = {.x = 0, .y = 0, .direction = DIR_UP};
   mdspan_search(map, &cursor.x, &cursor.y, TILE_COP);
   do {
-    MD_CM_GET(cursor.x, cursor.y, map) = TILE_EXPLORED;
+    MD_GET(map, cursor.x, cursor.y) = TILE_EXPLORED;
   } while (step_once(&cursor, map));
 
   uint32_t count = 0;
-  idx_t x, y;
-  for_all_points(x, y, map.dimensions) {
-    count += MD_CM_GET(x, y, map) == TILE_EXPLORED;
+  idx_t x = 0, y = 0;
+  for_all_points_cm(x, y, map.dimensions) {
+    count += MD_GET(map, x, y) == TILE_EXPLORED;
   }
 
   return count;
 }
 
-bool find_loop(struct cursor_t cursor, struct mdspan_t map,
-               struct mdspan_t directions) {
+bool find_loop(struct cursor_t cursor, mdspan_t map, mdspan_t directions) {
   while (step_once(&cursor, map)) {
-    if (MD_CM_GET(cursor.x, cursor.y, directions) & cursor.direction) {
+    if (MD_GET(directions, cursor.x, cursor.y) & cursor.direction) {
       return true;
     }
-    MD_CM_GET(cursor.x, cursor.y, directions) |= cursor.direction;
+    MD_GET(directions, cursor.x, cursor.y) |= cursor.direction;
   }
   return false;
 }
@@ -162,14 +139,14 @@ bool find_loop(struct cursor_t cursor, struct mdspan_t map,
 
 uint64_t part2(input_t input) {
   static char map_buffer[INPUT_BUFLEN];
-  struct mdspan_t map = {
+  mdspan_t map = {
       .buffer = map_buffer,
       .dimensions = INPUT_DIMS,
       .stride = INPUT_STRIDE,
   };
   memcpy(map.buffer, input.buffer, INPUT_BUFLEN);
   static char directions_buffer[DIRECTIONS_BUFLEN];
-  struct mdspan_t directions = {
+  mdspan_t directions = {
       .buffer = directions_buffer,
       .dimensions = INPUT_DIMS,
       .stride = DIRECTIONS_STRIDE,
@@ -180,23 +157,23 @@ uint64_t part2(input_t input) {
 
   struct cursor_t current = start;
   do {
-    MD_CM_GET(current.x, current.y, map) = TILE_EXPLORED;
+    MD_GET(map, current.x, current.y) = TILE_EXPLORED;
   } while (step_once(&current, map));
 
-  MD_CM_GET(start.x, start.y, map) = TILE_COP;
+  MD_GET(map, start.x, start.y) = TILE_COP;
   uint32_t count = 0;
-  idx_t x, y;
-  for_all_points(x, y, map.dimensions) {
-    if (MD_CM_GET(x, y, map) != TILE_EXPLORED) {
+  idx_t x = 0, y = 0;
+  for_all_points_cm(x, y, map.dimensions) {
+    if (MD_GET(map, x, y) != TILE_EXPLORED) {
       continue;
     }
-    MD_CM_GET(x, y, map) = TILE_BLOCK;
-    memset(directions.buffer, 0, MD_CM_BUFLEN(directions));
+    MD_GET(map, x, y) = TILE_BLOCK;
+    memset(directions.buffer, 0, MD_BUFLEN(directions));
     if (find_loop(start, map, directions)) {
-      MD_CM_GET(x, y, map) = TILE_EXPLORED;
+      MD_GET(map, x, y) = TILE_EXPLORED;
       count++;
     } else {
-      MD_CM_GET(x, y, map) = TILE_EMPTY;
+      MD_GET(map, x, y) = TILE_EMPTY;
     }
   }
   return count;
