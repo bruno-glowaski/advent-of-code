@@ -39,7 +39,14 @@ case $command in
     output_path="${OUTPUTS_DIR}/${day_filename}"
     zig cc -lc $source_path -o $output_path && gdb $output_path
   ;;
-  *) printf "error: unknown subcommand '%s'" $command 1>&2
+  "test")  zig run -DRUN_TESTS -lc -lm $source_path <$input_path
+  ;;
+  "test-gdb")  
+    mkdir -p $OUTPUTS_DIR
+    output_path="${OUTPUTS_DIR}/${day_filename}"
+    zig cc -DRUN_TESTS -lc -lm $source_path -o $output_path && gdb $output_path
+  ;;
+  *) printf "error: unknown subcommand '%s'\n" $command 1>&2
   ;;
 esac
 
