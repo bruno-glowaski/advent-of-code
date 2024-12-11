@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 
 #define DECLARE_VEC(_T, _dims, _ident) typedef _T _ident[_dims];
 

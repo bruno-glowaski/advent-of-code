@@ -20,6 +20,7 @@
   }
 #else
 #define UTEST(_suite, _name, _body)
+
 #define DECLARE_AOC_RUNNER()                                                   \
   int main() {                                                                 \
     input_t input = parse_input();                                             \
