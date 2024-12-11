@@ -1,0 +1,59 @@
+#!/bin/sh
+
+set -e
+
+YEAR="2024"
+SESSION_TOKEN_DIR="$HOME/.config/aoc-runner/session"
+INPUTS_DIR="./input"
+OUTPUTS_DIR="./target"
+CXX=g++
+CXX_FLAGS=-std=c++26
+CXX_TEST_FLAGS=-DRUN_TESTS
+
+day="$1"
+day_filename=$(printf "day%02i" $day)
+command="${2:-run}"
+
+# Check if file exist
+source_path="./${day_filename}.cpp"
+if [ ! -f $source_path ]; then
+  printf "error: source for day %s (%s) does not exist\n" $day $source_path 1>&2
+  exit 1
+fi
+
+# Download input if needed
+mkdir -p $INPUTS_DIR
+input_path="${INPUTS_DIR}/${day_filename}"
+if [ ! -f $input_path ]; then
+  if [ ! -f $SESSION_TOKEN_DIR ]; then
+    printf "error: no session token. Create a file at '%s' holding your AoC session token.\n" $SESSION_TOKEN_DIR 1>&2
+    exit 1
+  fi
+  session_token=$(cat $SESSION_TOKEN_DIR)
+
+  curl -b "session=${session_token}" "https://adventofcode.com/${YEAR}/day/${day}/input" > $input_path
+fi
+
+mkdir -p $OUTPUTS_DIR
+output_path="${OUTPUTS_DIR}/${day_filename}"
+case $command in
+  "run") 
+    $CXX $CXX_FLAGS $source_path -o $output_path
+    $output_path <$input_path
+  ;;
+  "run-gdb")  
+    $CXX $CXX_FLAGS $source_path -o $output_path
+    gdb $output_path
+  ;;
+  "test") 
+    $CXX $CXX_FLAGS $CXX_TEST_FLAGS $source_path -o $output_path
+    $output_path
+  ;;
+  "run-gdb")  
+    $CXX $CXX_FLAGS $CXX_TEST_FLAGS $source_path -o $output_path
+    $output_path
+  ;;
+  *) printf "error: unknown subcommand '%s'\n" $command 1>&2
+  ;;
+esac
+
